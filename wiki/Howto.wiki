@@ -1,0 +1,11 @@
+# howto use ipoddisk
+
+
+= Steps =
+
+Note that this is highly experimental stuff:
+  * download and unzip it
+  * chmod a+x ipoddisk (if necessary)
+  * plugin you iPod and make sure disk mode has been enabled
+  * ./ipoddisk -oping_diskarb,volname=iPodDisk,fsname=iPodDisk mnt
+
