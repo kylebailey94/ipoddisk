@@ -10,6 +10,6 @@ Note that this is highly *experimental* stuff:
   * plugin you iPod and make sure disk mode has been enabled
   * ./ipoddisk -oping_diskarb,volname=iPodDisk,fsname=iPodDisk mnt
 
-*PS*: 
+PS: 
   * source code will be uploaded shortly.
   * it has *not* been tested on Intel Macs.
