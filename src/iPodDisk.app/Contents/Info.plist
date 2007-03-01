@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+        <key>LSBackgroundOnly</key>
+        <string>1</string>
+	<key>CFBundleIconFile</key>
+	<string>iPodDisk</string>
+	<key>CFBundleName</key>
+	<string>iPodDisk</string>
+	<key>CFBundleVersion</key>
+	<string>2.0</string>
+	<key>CFBundleGetInfoString</key>
+	<string>iPodDisk version 2.0, Copyright 2005-2007 Isaac Huang.</string>
+</dict>
+</plist>
+
