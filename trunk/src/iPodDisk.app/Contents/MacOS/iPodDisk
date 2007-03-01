@@ -1,0 +1,89 @@
+#!/bin/sh
+
+display_warning_dialog () {
+# If no arguments were passed, return 1
+if [ -z "$1" ] 
+then 
+  return 1
+else
+  osascript <<WARNINGDIALOG
+	tell application "Finder"
+	    activate
+	    display dialog "$1" buttons {"Quit"} default button "Quit" with icon caution
+ 	end tell
+WARNINGDIALOG
+fi
+}
+
+# check against OS X version
+osxver=`sw_vers -productVersion`
+echo $osxver | grep '^10\.[45]'
+if [ $? -ne 0 ]
+then
+  display_warning_dialog "Sorry, iPodDisk requires OS X 10.4 or later"
+  exit 1
+fi
+
+# find the bundle contents dir
+# note: when Finder invokes this script, it uses absolute path. Thus, we can 'cd'
+# to other directory, and don't have to worry about $macosdir being a relative
+# path name.
+macosdir=`/usr/bin/dirname "$0"`
+contentsdir=`/usr/bin/dirname "$macosdir"`
+
+# quit if iPodDisk volume still mounted
+ipoddisk=`mount | grep '^iPodDisk' | awk '{print $3;}'`
+
+if [ ! -z "$ipoddisk" ]
+then
+  open "$ipoddisk"
+  exit 0
+fi
+
+# Find an iPod mount point
+for mp in /Volumes/*; do
+  if [ -f "$mp/iPod_Control/iTunes/iTunesDB" ]
+  then
+    ipodmp=$mp
+    break
+  fi
+done
+
+if [ -z "$ipodmp" ]
+then
+  display_warning_dialog "No iPod found. Is disk mode on?"
+  exit 1
+fi
+
+# create mount point
+mount_point=`mktemp -d -q -t iPodDisk`
+if [ $? -ne 0 ]
+then
+  display_warning_dialog "Failed to create mount point!"
+  exit 1
+fi
+
+# filenames must be double-quoted because $rootdir may contain spaces
+"$macosdir/ipoddiskfuse" -oping_diskarb,volname=iPodDisk,fsname=iPodDisk "$mount_point"
+
+errcode=$?
+if [ $errcode -ne 0 ]
+then
+  display_warning_dialog "iPodDisk failed to start. Have you installed MacFUSE?"
+  exit 1
+fi
+
+sleep 1
+
+# open iPodDisk volume
+ipoddisk=`mount | grep '^iPodDisk' | awk '{print $3;}'`
+
+if [ -z "$ipoddisk" ]
+then
+  display_warning_dialog "Failed to find iPodDisk volume."
+  exit 1
+else
+  open "$ipoddisk"
+fi
+
+exit 0
