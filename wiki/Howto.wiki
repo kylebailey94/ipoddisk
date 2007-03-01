@@ -5,11 +5,10 @@
 = Steps =
 
 Note that this is highly *experimental* stuff:
-  * download and unzip it
-  * chmod a+x ipoddisk (if necessary)
+  * If you haven't installed [http://code.google.com/p/macfuse/ MacFUSE], do it now.
+  * [http://code.google.com/p/ipoddisk/downloads/list download] and install iPodDisk.app
   * plugin you iPod and make sure disk mode has been enabled
-  * ./ipoddisk -oping_diskarb,volname=iPodDisk,fsname=iPodDisk mnt
+  * launch iPodDisk.app
 
 PS: 
-  * source code will be uploaded shortly.
   * it has *not* been tested on Intel Macs.
