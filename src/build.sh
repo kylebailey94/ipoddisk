@@ -25,14 +25,14 @@ make clean
 make
 
 echo "Changing library bindings..."
-for i in libgobject-2.0.0.dylib libgpod.1.dylib libglib-2.0.0.dylib libintl.8.dylib libiconv.2.dylib
+for i in libgobject-2.0.dylib libgpod.1.dylib libglib-2.0.dylib libintl.8.dylib libiconv.2.dylib
 do
   install_name_tool -change /opt/local/lib/$i @executable_path/../Resources/Library/$i ipoddisk
   # note: $i is symlink, but 'cp' by default follows symlinks
   cp /opt/local/lib/$i .
   install_name_tool -id @executable_path/../Resources/Library/$i $i
   # the libs reference each other, fix these references too
-  for j in libgobject-2.0.0.dylib libgpod.1.dylib libglib-2.0.0.dylib libintl.8.dylib libiconv.2.dylib
+  for j in libgobject-2.0.dylib libgpod.1.dylib libglib-2.0.dylib libintl.8.dylib libiconv.2.dylib
   do
     install_name_tool -change /opt/local/lib/$j @executable_path/../Resources/Library/$j $i
   done
