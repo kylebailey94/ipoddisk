@@ -24,6 +24,14 @@ then
   exit 1
 fi
 
+# check MacFUSE
+if [ ! -f /usr/local/lib/libfuse.dylib ]
+then
+  display_warning_dialog "Please download and install MacFUSE."
+  open http://code.google.com/p/macfuse/
+  exit 1
+fi
+
 # find the bundle contents dir
 # note: when Finder invokes this script, it uses absolute path. Thus, we can 'cd'
 # to other directory, and don't have to worry about $macosdir being a relative
@@ -69,7 +77,7 @@ fi
 errcode=$?
 if [ $errcode -ne 0 ]
 then
-  display_warning_dialog "iPodDisk failed to start. Have you installed MacFUSE?"
+  display_warning_dialog "iPodDisk failed to start. Please report this with the outputs of running /Applications/iPodDisk.app/Contents/MacOS/iPodDisk from the Terminal, thanks"
   exit 1
 fi
 
