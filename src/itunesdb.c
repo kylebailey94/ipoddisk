@@ -428,8 +428,10 @@ itdb_init (void)
 #else
 	struct statfs ipodstat;
 
-        if (ipod_disk_find_ipod(&ipodstat) != 0)
+        if (ipod_disk_find_ipod(&ipodstat) != 0) {
+                fprintf(stderr, "failed to find ipod mount point.\n");
                 return -1;
+        }
 
         dbfile = g_strconcat(ipodstat.f_mntonname,
                              "/iPod_Control/iTunes/iTunesDB", NULL);
