@@ -34,7 +34,7 @@ ipoddisk_statfs (const char *path, struct statvfs *stbuf)
 
         rc = (statvfs(mount_point, stbuf) == -1) ? -errno : 0;
 
-        stbuf->f_flag = ST_RDONLY;
+        stbuf->f_flag = ST_RDONLY | ST_NOSUID;
 
         return rc;
 }
