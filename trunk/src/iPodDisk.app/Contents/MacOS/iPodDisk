@@ -27,7 +27,7 @@ fi
 # check MacFUSE
 if [ ! -f /usr/local/lib/libfuse.dylib ]
 then
-  display_warning_dialog "Please download and install MacFUSE."
+  display_warning_dialog "Please download and install MacFUSE first."
   open http://code.google.com/p/macfuse/
   exit 1
 fi
@@ -64,15 +64,11 @@ then
 fi
 
 # create mount point
-mount_point=`mktemp -d -q -t iPodDisk`
-if [ $? -ne 0 ]
-then
-  display_warning_dialog "Failed to create mount point!"
-  exit 1
-fi
+mount_point=/Volumes/iPodDisk/
+mkdir $mount_point
 
 # filenames must be double-quoted because $rootdir may contain spaces
-"$macosdir/ipoddiskfuse" -oping_diskarb,volname=iPodDisk,fsname=iPodDisk "$mount_point"
+"$macosdir/ipoddiskfuse" -oping_diskarb,volname=iPodDisk,fsname=iPodDisk $mount_point
 
 errcode=$?
 if [ $errcode -ne 0 ]
