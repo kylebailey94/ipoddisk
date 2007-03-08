@@ -6,5 +6,8 @@ ipoddisk: ipoddisk.c itunesdb.c itunesdb.h
 
 test: ipoddisk
 	./ipoddisk -oping_diskarb,volname=iPodDisk,fsname=iPodDisk ../../.mnt
+
+SetOpenWindow: SetOpenWindow.c
+	gcc -framework CoreServices $+ -o $@
 clean:
 	-rm -f ipoddisk ipoddisk.o

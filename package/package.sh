@@ -80,6 +80,9 @@ cp $package_dir/*.txt "$dmgvol/"
 cp $package_dir/*.webloc "$dmgvol/"
 ln -s /Applications "$dmgvol/Applications"
 
+echo "Set autoopen..."
+"$package_dir/../src/SetOpenWindow" "$dmgvol"
+
 echo "Window design..."
 set_window_design > /dev/null
 # check OS X version because the Panther Finder Dictionnary doesn't set the bacground picture
