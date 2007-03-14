@@ -29,9 +29,9 @@ typedef enum {
 } ipoddisk_node_type;
 
 struct ipoddisk_node {
-	gchar *nd_name;
-	GData *nd_children;
-	ipoddisk_node_type nd_type;
+	gchar              *nd_name;
+	GData              *nd_children;
+	ipoddisk_node_type  nd_type;
 };
 
 struct __add_playlist_member_arg {
@@ -43,8 +43,6 @@ struct __add_playlist_member_arg {
 extern gchar *mount_point;
 
 int itdb_init(void);
-void ipod_free(void);
-struct ipoddisk_node *get_ipoddisk_tree(void);
 struct ipoddisk_node *ipod_disk_parse_path(const char *path, int len);
 gchar *ipoddisk_node_path(struct ipoddisk_node *node);
 

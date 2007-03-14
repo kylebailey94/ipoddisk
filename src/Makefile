@@ -1,5 +1,4 @@
 ub_flags=-O -arch i386 -arch ppc -isysroot /Developer/SDKs/MacOSX10.4u.sdk
-debug_flags=-D__TEST_WITHOUT_IPO=1
 
 ipoddisk: ipoddisk.c itunesdb.c itunesdb.h
 	gcc ${ub_flags} -Wall `pkg-config --cflags --libs glib-2.0 gobject-2.0 libgpod-1.0 fuse` $+ -o $@

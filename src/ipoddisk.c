@@ -124,7 +124,6 @@ static int ipoddisk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         UNUSED(fi);
         UNUSED(offset);
 
-
         node = ipod_disk_parse_path(path, strlen(path));
         if(node == NULL || node->nd_type == IPOD_DISK_NODE_LEAF)
                 return -ENOENT;
