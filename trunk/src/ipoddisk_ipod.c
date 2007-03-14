@@ -2,7 +2,7 @@
  * vim:expandtab:shiftwidth=8:tabstop=8:
  */
 
-#include "itunesdb.h"
+#include "ipoddisk.h"
 
 gchar *mount_point;
 

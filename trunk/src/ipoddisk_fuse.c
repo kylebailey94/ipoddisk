@@ -18,7 +18,7 @@
 
 #include <sys/xattr.h>
 
-#include "itunesdb.h"
+#include "ipoddisk.h"
 
 
 static uid_t the_uid;
