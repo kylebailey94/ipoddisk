@@ -23,7 +23,7 @@ ipod_disk_parse_path(const char *path, int len)
 
 	tokens = g_strsplit(path, "/", IPODDISK_MAX_PATH_TOKENS);
 	orig = tokens;
-	parent = get_ipoddisk_tree();
+	parent = ipoddisk_tree;
 	node = parent;
 	while (*tokens) {
 		gchar *token = *tokens;
@@ -343,11 +343,6 @@ ipod_disk_build_tree (Itdb_iTunesDB *itdb)
 gchar *
 ipoddisk_node_path (struct ipoddisk_node *node)
 {
-#ifdef __TEST_WITHOUT_IPOD
-        assert(node->nd_type == IPOD_DISK_NODE_LEAF);
-
-	return g_strdup("/Users/clay/Projects/foo.m4a");
-#else
         gchar      *rpath; /* relative path */
         gchar      *apath; /* absolute path */
         Itdb_Track *track;
@@ -364,7 +359,6 @@ ipoddisk_node_path (struct ipoddisk_node *node)
 
         g_free(rpath);
         return apath;
-#endif
 }
 
 int
@@ -422,10 +416,6 @@ int
 itdb_init (void)
 {
 	gchar         *dbfile;
-
-#ifdef __TEST_WITHOUT_IPOD
-        dbfile = g_strdup("/Users/clay/Projects/iTunes.hh/iTunesDB");
-#else
 	struct statfs ipodstat;
 
         if (ipod_disk_find_ipod(&ipodstat) != 0) {
@@ -435,7 +425,6 @@ itdb_init (void)
 
         dbfile = g_strconcat(ipodstat.f_mntonname,
                              "/iPod_Control/iTunes/iTunesDB", NULL);
-#endif
 
 	the_itdb = itdb_parse_file(dbfile, &error);
 
@@ -455,13 +444,8 @@ itdb_init (void)
 
         ipod_disk_build_tree(the_itdb);
 
-#ifdef __TEST_WITHOUT_IPOD
-	mount_point = g_strdup("/");
-#else
 	mount_point = g_strdup(ipodstat.f_mntonname);
-
         open(dbfile, O_RDONLY); /* leave me not, babe */
-#endif
 
 	g_free(dbfile);
 
@@ -485,10 +469,4 @@ ipod_free(void)
 	/* TODO: clear datalists within artists and playlists */
 
 	return;
-}
-
-struct ipoddisk_node *
-get_ipoddisk_tree(void)
-{
-	return ipoddisk_tree;
 }
