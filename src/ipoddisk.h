@@ -1,8 +1,8 @@
 /*
  * vim:expandtab:shiftwidth=8:tabstop=8:
  */
-#ifndef IPODDISK_ITDB_H
-#define IPODDISK_ITDB_H
+#ifndef __IPODDISK_H
+#define __IPODDISK_H
 
 #ifndef MADE_WITHOUT_COMPROMISE
 #define MADE_WITHOUT_COMPROMISE
@@ -47,4 +47,4 @@ struct ipoddisk_node *ipod_disk_parse_path(const char *path, int len);
 gchar *ipoddisk_node_path(struct ipoddisk_node *node);
 
 
-#endif /* IPODDISK_ITDB_H */
+#endif /* __IPODDISK_H */
