@@ -28,15 +28,8 @@ static struct timeval the_time;
 static int 
 ipoddisk_statfs (const char *path, struct statvfs *stbuf)
 {
-        int rc;
-
         memset(stbuf, 0, sizeof(*stbuf));
-
-        rc = (statvfs(mount_point, stbuf) == -1) ? -errno : 0;
-
-        stbuf->f_flag = ST_RDONLY | ST_NOSUID;
-
-        return rc;
+        return ipoddisk_statipods(stbuf);
 }
 
 static int 
@@ -235,7 +228,7 @@ ipoddisk_listxattr (const char *path, char *list, size_t size)
 }
 #endif
 
-static struct fuse_operations ipoddisk_oper = {
+static struct fuse_operations ipoddisk_ops = {
         .statfs    = ipoddisk_statfs,
         .getattr   = ipoddisk_getattr,
         .access	   = ipoddisk_access,
@@ -253,13 +246,15 @@ int main(int argc, char *argv[])
         the_uid = getuid();
         the_gid = getgid();
 
-        if (gettimeofday(&the_time, NULL) != 0)
+        if (gettimeofday(&the_time, NULL) != 0) {
                 perror("failed to get current time: ");
+                return 1;
+        }
 
-        if (itdb_init() != 0) {
-                fprintf(stderr, "itdb_init() has failed.\n");
+        if (ipoddisk_init_ipods() != 0) {
+                fprintf(stderr, "ipoddisk_init_ipods() has failed.\n");
                 return 1;
         }
         
-        return fuse_main(argc, argv, &ipoddisk_oper, NULL);
+        return fuse_main(argc, argv, &ipoddisk_ops, NULL);
 }
