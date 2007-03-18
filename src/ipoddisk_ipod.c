@@ -5,8 +5,8 @@
 #include "ipoddisk.h"
 
 #define IPODDISK_MAX_IPOD       16
-int ipodnr;
-struct ipoddisk_node *ipods[IPODDISK_MAX_IPOD];
+static int ipodnr;
+static struct ipoddisk_node *ipods[IPODDISK_MAX_IPOD];
 static struct ipoddisk_node *ipoddisk_tree;
 static GError *error = NULL;
 
@@ -76,9 +76,6 @@ ipoddisk_parse_path (const char *path, int len)
 
 #undef IPODDISK_MAX_PATH_TOKENS
 
-
-#define IPODDISK_NEW_NODE()	g_slice_new(struct ipoddisk_node)
-
 /* FIXME: assume track->ipod_path has an extension 
    of 4 char, e.g. '.mp3', '.m4a'. */
 #define IPOD_TRACK_EXTENSION_LEN	4
@@ -95,37 +92,55 @@ ipod_get_track_extension (gchar * path)
 }
 
 static void
-ipod_encode_name(gchar ** strpp)
+ipoddisk_encode_name (gchar **strpp)
 {
-	int i, len;
 	gchar *old = *strpp;
+        gchar *nstr;         /* normalized utf-8 string */
+	int    i;
 
-	/* encode path names to appease Finder:
-	   0. leading . are treated as hidden file, encode as _
-	   1. slash is Unix path separator, encode as : 
-	   2. \r and \n are problematic, encode as space
+        if (old == NULL)
+                return;
 
-	   then normalize the string to cope with tricky
-	   things like umlaut */
-	if (old) {
-		gchar *nstr;			/* normalized utf-8 string */
+	/* Encode path names to appease Finder:
+	 * 0. leading . is treated as hidden file, encode as _
+	 * 1. slash is Unix path separator, encode as : 
+	 * 2. \r and \n are problematic, encode as space
+	 * Then normalize the string to cope with tricky
+	 * things like umlaut */
+        for (i = 0; i < strlen(old); i++) {
+                if (i == 0 && old[i] == '.')
+                        old[i] = '_';
+                else if (old[i] == '/')
+                        old[i] = ':';
+                else if (old[i] == '\r' || old[i] == '\n')
+                        old[i] = ' ';
+        }
+        
+        nstr = g_utf8_normalize(old, -1, G_NORMALIZE_NFD);
+        if (nstr) {
+                g_free(old);
+                *strpp = nstr;
+        }
 
-		len = strlen(old);
-		for (i = 0; i < len; i++) {
-			if ((i == 0) && (old[i] == '.'))
-				old[i] = '_';
-			if (old[i] == '/')
-				old[i] = ':';
-			if ((old[i] == '\r') || (old[i] == '\n'))
-				old[i] = ' ';
-		}
+        return;
+}
 
-		nstr = g_utf8_normalize(old, len, G_NORMALIZE_NFD);
-		if (nstr) {
-			g_free(old);
-			*strpp = nstr;
-		}
-	}
+static inline struct ipoddisk_node *
+ipoddisk_new_node (struct ipoddisk_node *parent, char *name,
+                   ipoddisk_node_type type)
+{
+        struct ipoddisk_node *node = g_slice_new(struct ipoddisk_node);
+
+        node->nd_name = name;
+        node->nd_type = type;
+
+        if (type != IPOD_DISK_NODE_LEAF) /* leaf node has no children */
+                g_datalist_init(&node->nd_children);
+
+        if (parent != NULL)
+                g_datalist_set_data(&parent->nd_children, node->nd_name, node);
+
+        return node;
 }
 
 /**
@@ -136,42 +151,39 @@ ipod_encode_name(gchar ** strpp)
  * @return Pointer to the parent node of the track
  */
 static struct ipoddisk_node *
-__ipod_add_track(Itdb_Track *itdbtrk, struct ipoddisk_node *start,
-                 struct ipoddisk_node *track, struct ipoddisk_ipod *ipod)
+ipoddisk_add_track (Itdb_Track *itdbtrk, struct ipoddisk_node *start,
+                    struct ipoddisk_node *track, struct ipoddisk_ipod *ipod)
 {
 	struct ipoddisk_node *artist;
 	struct ipoddisk_node *album;
-	gchar *artist_name, *album_name, *track_name, *track_ext;
+	gchar                *track_ext;
+	gchar                *album_name;
+	gchar                *track_name;
+	gchar                *artist_name;
 
+	album_name  = itdbtrk->album ? itdbtrk->album : "Unknown Album";
+	track_name  = itdbtrk->title ? itdbtrk->title : "Unknown Track";
 	artist_name = itdbtrk->artist ? itdbtrk->artist : "Unknown Artist";
-	album_name = itdbtrk->album ? itdbtrk->album : "Unknown Album";
-	track_name = itdbtrk->title ? itdbtrk->title : "Unknown Track";
 
 	artist = g_datalist_get_data(&start->nd_children, artist_name);
-	if (!artist) {
-		artist = IPODDISK_NEW_NODE();
-		artist->nd_name = artist_name;
-		artist->nd_type = IPOD_DISK_NODE_DEFAULT;
-		g_datalist_init(&artist->nd_children);
-		g_datalist_set_data(&start->nd_children, artist->nd_name, artist);
-	}
+	if (!artist)
+		artist = ipoddisk_new_node(start, artist_name,
+                                           IPOD_DISK_NODE_DEFAULT);
+
 	album = g_datalist_get_data(&artist->nd_children, album_name);
-	if (!album) {
-		album = IPODDISK_NEW_NODE();
-		album->nd_name = album_name;
-		album->nd_type = IPOD_DISK_NODE_DEFAULT;
-		g_datalist_init(&album->nd_children);
-		g_datalist_set_data(&artist->nd_children, album->nd_name, album);
-	}
+	if (!album)
+		album = ipoddisk_new_node(artist, album_name,
+                                          IPOD_DISK_NODE_DEFAULT);
+
 	/* when track is not NULL, duplicate tracks already taken care 
-	   of in the 1st run of this function, so no need to check for 
-	   dups again. */
+	 * of in the 1st run of this function, so no need to check for 
+	 * dups again. */
 	if (!track) {
 		int                   dup_cnt = 0;
 		gchar                *dup_str = NULL;
 		struct ipoddisk_node *dup_trk;
 
-                assert(ipod != NULL);
+                assert (ipod != NULL);
 
 		track_ext = ipod_get_track_extension(itdbtrk->ipod_path);
 		track_name = g_strconcat(track_name, track_ext, NULL);
@@ -185,195 +197,145 @@ __ipod_add_track(Itdb_Track *itdbtrk, struct ipoddisk_node *start,
 			g_free(dup_str);
 			dup_trk = g_datalist_get_data(&album->nd_children, track_name);
 		}
-		track = IPODDISK_NEW_NODE();
-		track->nd_name = track_name;
+		track = ipoddisk_new_node(album, track_name,
+                                          IPOD_DISK_NODE_LEAF);
 		track->nd_children = (GData *) itdbtrk;
-		track->nd_type = IPOD_DISK_NODE_LEAF;
                 track->nd_data.track.trk_ipod = ipod;
 		itdbtrk->userdata = track;
-	}
-	g_datalist_set_data(&album->nd_children, track->nd_name, track);
+	} else {
+                g_datalist_set_data(&album->nd_children, track->nd_name, track);
+        }
 
 	return album;
 }
 
-static void
-ipod_add_track(gpointer data, gpointer user_data)
-{
-	struct ipoddisk_node **nodes = (struct ipoddisk_node **) user_data;
-	struct ipoddisk_node *artists = nodes[0];
-	struct ipoddisk_node *genres = nodes[1];
-	struct ipoddisk_node *albums = nodes[2];
-	struct ipoddisk_node *ipod = nodes[3];
-	struct ipoddisk_node *genre;
-	struct ipoddisk_node *album;
-	Itdb_Track *itdbtrk = (Itdb_Track *) data;
-
-	if (itdbtrk->artist)
-		ipod_encode_name(&itdbtrk->artist);
-	if (itdbtrk->album)
-		ipod_encode_name(&itdbtrk->album);
-	if (itdbtrk->title)
-		ipod_encode_name(&itdbtrk->title);
-	if (itdbtrk->genre)
-		ipod_encode_name(&itdbtrk->genre);
-
-	album = __ipod_add_track(itdbtrk, artists, NULL, &ipod->nd_data.ipod);
-	/* FIXME: if there're more than one album with a same name, only
-	   the last one added is accessible */
-	g_datalist_set_data(&albums->nd_children, album->nd_name, album);
-
-	if ((itdbtrk->genre != NULL) && (strlen(itdbtrk->genre))) {
-		genre = g_datalist_get_data(&genres->nd_children, itdbtrk->genre);
-		if (!genre) {
-			genre = IPODDISK_NEW_NODE();
-			genre->nd_name = itdbtrk->genre;
-			genre->nd_type = IPOD_DISK_NODE_DEFAULT;
-			g_datalist_init(&genre->nd_children);
-			g_datalist_set_data(&genres->nd_children, genre->nd_name, genre);
-		}
-		__ipod_add_track(itdbtrk, genre,
-				 (struct ipoddisk_node *) itdbtrk->userdata, NULL);
-	}
-
-	return;
-}
+struct __add_member_arg {
+        char                 *prefixfmt;
+        int                   counter;
+        struct ipoddisk_node *ipod;
+        struct ipoddisk_node *playlist;
+};
 
 static void
-ipod_add_playlist_member(gpointer data, gpointer user_data)
+ipoddisk_add_playlist_member (gpointer data, gpointer user_data)
 {
-	struct __add_playlist_member_arg *argp =
-		(struct __add_playlist_member_arg *) user_data;
-	Itdb_Track *itdbtrk = (Itdb_Track *) data;
-	struct ipoddisk_node *pl = argp->playlist;
-	struct ipoddisk_node *track;
-	gchar *track_ext;
-	gchar *track_name = itdbtrk->title ? itdbtrk->title : "Unknown Track";
+	Itdb_Track              *itdbtrk = data;
+	struct __add_member_arg *argp = user_data;
+	struct ipoddisk_node    *track;
+	gchar                   *track_ext;
+	gchar                   *track_name;
 
-	/* can't reuse ipoddisk_node in itdbtrk->userdata, because
-	   here a prefix is used in nd_name of every ipoddisk_node */
-	track = IPODDISK_NEW_NODE();
 	track_ext = ipod_get_track_extension(itdbtrk->ipod_path);
-    if (argp->format) {
-        gchar *prefix;
+	track_name = itdbtrk->title ? itdbtrk->title : "Unknown Track";
+        
+        if (argp->prefixfmt) {
+                gchar *prefix;
 
-        prefix = g_strdup_printf(argp->format, argp->nr);
-        track->nd_name = g_strconcat(prefix, track_name, track_ext, NULL);
-        g_free(prefix);
-    } else {
-        track->nd_name = g_strconcat(track_name, track_ext, NULL);
-    }
+                prefix = g_strdup_printf(argp->prefixfmt, argp->counter);
+                track_name = g_strconcat(prefix, track_name, track_ext, NULL);
+                
+                g_free(prefix);
+        } else {
+                track_name = g_strconcat(track_name, track_ext, NULL);
+        }
+
+	track = ipoddisk_new_node(argp->playlist, track_name,
+                                  IPOD_DISK_NODE_LEAF);
+        /* TODO: store itdbtrk in rack->nd_data.track */
 	track->nd_children = (GData *) itdbtrk;
-	track->nd_type = IPOD_DISK_NODE_LEAF;
-        track->nd_data.track.trk_ipod = argp->ipod;
-	g_datalist_set_data(&pl->nd_children, track->nd_name, track);
-	argp->nr++;
+        track->nd_data.track.trk_ipod = &argp->ipod->nd_data.ipod;
 
-	return;
-}
-
-static void
-ipod_add_playlist(gpointer data, gpointer user_data)
-{
-	struct ipoddisk_node **nodes = (struct ipoddisk_node **) user_data;
-	struct ipoddisk_node *start = nodes[0];
-	struct ipoddisk_node *ipod = nodes[1];
-	struct ipoddisk_node *playlist;
-	gchar *pl_name;
-	Itdb_Playlist *pl = (Itdb_Playlist *) data;
-
-	if (itdb_playlist_is_mpl(pl))
-		return;
-
-	if (pl->name)
-		ipod_encode_name(&pl->name);
-
-	pl_name = pl->name ? pl->name : "Unknown Playlist";
-
-	playlist = g_datalist_get_data(&start->nd_children, pl_name);
-	if (!playlist) {
-		playlist = IPODDISK_NEW_NODE();
-		playlist->nd_name = pl_name;
-		playlist->nd_type = IPOD_DISK_NODE_DEFAULT;
-		g_datalist_init(&playlist->nd_children);
-		g_datalist_set_data(&start->nd_children, playlist->nd_name, playlist);
-	}
-
-	{
-		struct __add_playlist_member_arg arg;
-		/* TODO: check why pl->num is incorrect */
-		guint cnt = g_list_length(pl->members);
-
-		if (cnt < 10) {
-			arg.format = "%d. ";
-            if (cnt == 1)
-                arg.format = NULL;
-		} else if (cnt < 100) {
-			arg.format = "%.2d. ";
-		} else if (cnt < 1000) {
-			arg.format = "%.3d. ";
-		} else {
-			arg.format = "%.4d. ";
-		}
-		arg.nr = 1;
-		arg.playlist = playlist;
-                arg.ipod     = &ipod->nd_data.ipod;
-		/* FIXME: the order of tracks in the 'members' list is different than
-		   the order in iPod's menu if the playlist is "Recently Played".
-		 */
-		g_list_foreach(pl->members, ipod_add_playlist_member, &arg);
-	}
-
+	argp->counter++;
 	return;
 }
 
 void
 ipoddisk_build_ipod_node (struct ipoddisk_node *root, Itdb_iTunesDB *itdb)
 {
+        GList                *list;
         struct ipoddisk_node *genres;
         struct ipoddisk_node *albums;
         struct ipoddisk_node *artists;
-        struct ipoddisk_node *nodes[4];
         struct ipoddisk_node *playlists;
 
-        artists = IPODDISK_NEW_NODE();
-        g_datalist_init(&artists->nd_children);
-        artists->nd_name = "Artists";
-        artists->nd_type = IPOD_DISK_NODE_DEFAULT;
+        genres    = ipoddisk_new_node(root, "Genres", IPOD_DISK_NODE_DEFAULT);
+        albums    = ipoddisk_new_node(root, "Albums", IPOD_DISK_NODE_DEFAULT);
+        artists   = ipoddisk_new_node(root, "Artists", IPOD_DISK_NODE_DEFAULT);
+        playlists = ipoddisk_new_node(root, "Playlists", IPOD_DISK_NODE_DEFAULT);
 
-        playlists = IPODDISK_NEW_NODE();
-        g_datalist_init(&playlists->nd_children);
-        playlists->nd_name = "Playlists";
-        playlists->nd_type = IPOD_DISK_NODE_DEFAULT;
+        /* Populate iPodDisk/(Artists|Albums|Genres) */
+        list = itdb->tracks;
+        while (list) {
+                Itdb_Track           *itdbtrk = list->data;
+                struct ipoddisk_node *genre;
+                struct ipoddisk_node *album;
 
-        genres = IPODDISK_NEW_NODE();
-        g_datalist_init(&genres->nd_children);
-        genres->nd_name = "Genres";
-        genres->nd_type = IPOD_DISK_NODE_DEFAULT;
+                list = g_list_next(list);
 
-        albums = IPODDISK_NEW_NODE();
-        g_datalist_init(&albums->nd_children);
-        albums->nd_name = "Albums";
-        albums->nd_type = IPOD_DISK_NODE_DEFAULT;
+                ipoddisk_encode_name(&itdbtrk->album);
+                ipoddisk_encode_name(&itdbtrk->title);
+                ipoddisk_encode_name(&itdbtrk->genre);
+                ipoddisk_encode_name(&itdbtrk->artist);
 
-        g_datalist_set_data(&root->nd_children, artists->nd_name, artists);
-        g_datalist_set_data(&root->nd_children, playlists->nd_name, playlists);
-        g_datalist_set_data(&root->nd_children, genres->nd_name, genres);
-        g_datalist_set_data(&root->nd_children, albums->nd_name, albums);
+                album = ipoddisk_add_track(itdbtrk, artists,
+                                           NULL, &root->nd_data.ipod);
+                /* FIXME: if there're more than one album with a same name, only
+                   the last one added is accessible */
+                g_datalist_set_data(&albums->nd_children, album->nd_name, album);
 
-        /* must call ipod_add_track() before ipod_add_playlist()
-           because strings in the_itdb->tracks are encoded in the former.
-         */
-        nodes[0] = artists;
-        nodes[1] = genres;
-        nodes[2] = albums;
-        nodes[3] = root;
-        /* populate iPodDisk/(Artists|Albums|Genres) */
-        g_list_foreach(itdb->tracks, ipod_add_track, nodes);
-        /* populate iPodDisk/Playlists */
-        nodes[0] = playlists;
-        nodes[1] = root;
-        g_list_foreach(itdb->playlists, ipod_add_playlist, nodes);
+                if (itdbtrk->genre == NULL || strlen(itdbtrk->genre) == 0)
+                        continue;
+
+                genre = g_datalist_get_data(&genres->nd_children, itdbtrk->genre);
+                if (genre == NULL)
+                        genre = ipoddisk_new_node(genres, itdbtrk->genre,
+                                                  IPOD_DISK_NODE_DEFAULT);
+                ipoddisk_add_track(itdbtrk, genre, 
+                                   (struct ipoddisk_node *) itdbtrk->userdata, NULL);
+        }
+
+        /* Populate iPodDisk/Playlists */
+        list = itdb->playlists;
+        while (list) {
+                Itdb_Playlist          *itdbpl = list->data;
+                gchar                  *pl_name;
+                guint                   cnt;
+                struct ipoddisk_node   *pl;
+                struct __add_member_arg arg;
+
+                list = g_list_next(list);
+
+                if (itdb_playlist_is_mpl(itdbpl))
+                        continue;
+
+		ipoddisk_encode_name(&itdbpl->name);
+                pl_name = itdbpl->name ? itdbpl->name : "Unknown Playlist";
+
+                pl = g_datalist_get_data(&playlists->nd_children, pl_name);
+                if (pl == NULL)
+                        pl = ipoddisk_new_node(playlists, pl_name,
+                                               IPOD_DISK_NODE_DEFAULT);
+
+                cnt = g_list_length(itdbpl->members);
+                if (cnt == 1) {
+                        arg.prefixfmt = NULL;
+                } else if (cnt < 10) {
+                        arg.prefixfmt = "%d. ";
+                } else if (cnt < 100) {
+                        arg.prefixfmt = "%.2d. ";
+                } else if (cnt < 1000) {
+                        arg.prefixfmt = "%.3d. ";
+                } else {
+                        arg.prefixfmt = "%.4d. ";
+                }
+
+                arg.counter  = 1;
+                arg.playlist = pl;
+                arg.ipod     = root;
+
+		g_list_foreach(itdbpl->members,
+                               ipoddisk_add_playlist_member, &arg);
+        }
 
         return;
 }
@@ -418,11 +380,8 @@ ipoddisk_init_one_ipod (gchar *dbfile)
 	if (the_itdb == NULL)
 		return NULL;
 
-        node = IPODDISK_NEW_NODE();
-
-        node->nd_type                = IPOD_DISK_NODE_IPOD;
+        node = ipoddisk_new_node(NULL, NULL, IPOD_DISK_NODE_IPOD);
         node->nd_data.ipod.ipod_itdb = the_itdb;
-        g_datalist_init(&node->nd_children);
 
         ipoddisk_build_ipod_node(node, the_itdb);
 
@@ -499,11 +458,8 @@ ipoddisk_init_ipods (void)
                 return 0;
         }
 
-        ipoddisk_tree = IPODDISK_NEW_NODE();
-        g_datalist_init(&ipoddisk_tree->nd_children);
-        ipoddisk_tree->nd_name = "*Mount Point*";
-        ipoddisk_tree->nd_type = IPOD_DISK_NODE_ROOT;
-
+        ipoddisk_tree = ipoddisk_new_node(NULL, "*Mount Point*",
+                                          IPOD_DISK_NODE_ROOT);
         for (i = 0; i < ipodnr; i++)
                 g_datalist_set_data(&ipoddisk_tree->nd_children,
                                     ipods[i]->nd_name, ipods[i]);
