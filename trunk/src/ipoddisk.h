@@ -60,7 +60,7 @@ extern gchar *mount_point;
 
 int ipoddisk_init_ipods (void);
 int ipoddisk_statipods (struct statvfs *stbuf);
-struct ipoddisk_node *ipod_disk_parse_path (const char *path, int len);
+struct ipoddisk_node *ipoddisk_parse_path (const char *path, int len);
 gchar *ipoddisk_node_path (struct ipoddisk_node *node);
 
 

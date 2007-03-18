@@ -36,36 +36,44 @@ ipoddisk_statipods (struct statvfs *stbuf)
 }
 
 #define IPODDISK_MAX_PATH_TOKENS	12
+
 struct ipoddisk_node *
-ipod_disk_parse_path(const char *path, int len)
+ipoddisk_parse_path (const char *path, int len)
 {
-	gchar **tokens, **orig;
 	struct ipoddisk_node *node;
 	struct ipoddisk_node *parent;
+	gchar                **orig;
+	gchar                **tokens;
 
 	UNUSED(len);
 
-	tokens = g_strsplit(path, "/", IPODDISK_MAX_PATH_TOKENS);
-	orig = tokens;
+        node   =
 	parent = ipoddisk_tree;
-	node = parent;
+	orig   =
+        tokens = g_strsplit(path, "/", IPODDISK_MAX_PATH_TOKENS);
+
 	while (*tokens) {
 		gchar *token = *tokens;
+
 		tokens++;
-		if (strlen(token)) {
-			if (parent->nd_type == IPOD_DISK_NODE_LEAF) {
-				node = NULL;
-				break;
-			}
-			node = g_datalist_get_data(&parent->nd_children, token);
-			if (node == NULL)
-				break;
-			parent = node;
-		}
+                if (strlen(token) == 0)
+                        continue;
+
+                if (parent->nd_type == IPOD_DISK_NODE_LEAF) {
+                        node = NULL;
+                        break;
+                }
+
+                node = g_datalist_get_data(&parent->nd_children, token);
+                if (node == NULL)
+                        break;
+                parent = node;
 	}
+
 	g_strfreev(orig);
 	return node;
 }
+
 #undef IPODDISK_MAX_PATH_TOKENS
 
 
