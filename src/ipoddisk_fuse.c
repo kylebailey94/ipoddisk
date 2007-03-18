@@ -10,19 +10,17 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/time.h>
-
 /* for pread(2) */
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
-
 #include <sys/xattr.h>
 
 #include "ipoddisk.h"
 
 
-static uid_t the_uid;
-static gid_t the_gid;
+static uid_t          the_uid;
+static gid_t          the_gid;
 static struct timeval the_time;
 
 static int 
@@ -35,37 +33,33 @@ ipoddisk_statfs (const char *path, struct statvfs *stbuf)
 static int 
 ipoddisk_getattr (const char *path, struct stat *stbuf)
 {
-        int                   rc;
+        int                   rc = 0;
         struct ipoddisk_node *node;
 
-        memset(stbuf, 0, sizeof(*stbuf));
-
-        node = ipod_disk_parse_path(path, strlen(path));
+        node = ipoddisk_parse_path(path, strlen(path));
         if (node == NULL)
                 return -ENOENT;
+
+        memset(stbuf, 0, sizeof(*stbuf));
 
         if (node->nd_type == IPOD_DISK_NODE_LEAF) {
                 gchar *file = ipoddisk_node_path(node);
 
                 rc = (lstat(file, stbuf) == -1) ? -errno : 0;
-
                 stbuf->st_mode = S_IFREG |                    /* regular */
                                  S_IRUSR | S_IRGRP | S_IROTH; /* readable */
 
                 g_free(file);
         } else {
-                rc = 0;
-
-                stbuf->st_mode = S_IFDIR |                     /* directory */
-                                 S_IRUSR | S_IRGRP | S_IROTH | /* readable */
-                                 S_IXUSR | S_IXGRP | S_IXOTH;  /* executable */
-
                 stbuf->st_nlink = 2;
                 stbuf->st_size  = 1024;
                 stbuf->st_ino   = (ino_t) node;
                 stbuf->st_atime = 
                 stbuf->st_mtime =
                 stbuf->st_ctime = the_time.tv_sec;
+                stbuf->st_mode  = S_IFDIR |                     /* directory */
+                                  S_IRUSR | S_IRGRP | S_IROTH | /* readable */
+                                  S_IXUSR | S_IXGRP | S_IXOTH;  /* executable */
         }
 
         stbuf->st_uid = the_uid;
@@ -79,56 +73,55 @@ ipoddisk_access (const char *path, int mask)
 {
         struct ipoddisk_node *node;
 
-        node = ipod_disk_parse_path(path, strlen(path));
+        node = ipoddisk_parse_path(path, strlen(path));
         if (node == NULL)
                 return -ENOENT;
 
-        if (mask & W_OK)
+        if (mask & W_OK)     /* everything is read-only */
                 return -EROFS;
 
-        if (node->nd_type == IPOD_DISK_NODE_LEAF &&
-            (mask & X_OK))
+        if ((mask & X_OK) && /* only directories are executable */
+            node->nd_type == IPOD_DISK_NODE_LEAF)
                 return -EACCES;
 
         return 0;
 }
 
-struct foo_arg {
-        fuse_fill_dir_t filler;
-        void *buf;
+struct __readdir_arg {
+        void            *buf;
+        fuse_fill_dir_t  filler;
 };
 
 void
-ipoddisk_add_node_prop(GQuark key_id, gpointer data, gpointer user_data)
+ipoddisk_gen_dir_entry(GQuark key_id, gpointer data, gpointer user_data)
 {
-	struct ipoddisk_node *node = (struct ipoddisk_node *) data;
-        struct foo_arg *arg = user_data;
+	struct ipoddisk_node *node = data;
+        struct __readdir_arg *arg = user_data;
 
 
         (arg->filler)(arg->buf, node->nd_name, NULL, 0);
 }
 
 static int ipoddisk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                         off_t offset, struct fuse_file_info *fi)
+                            off_t offset, struct fuse_file_info *fi)
 {
         struct ipoddisk_node *node;
-        struct foo_arg arg;
+        struct __readdir_arg arg;
 
         UNUSED(fi);
         UNUSED(offset);
 
-        node = ipod_disk_parse_path(path, strlen(path));
+        node = ipoddisk_parse_path(path, strlen(path));
         if(node == NULL || node->nd_type == IPOD_DISK_NODE_LEAF)
                 return -ENOENT;
+
+        arg.buf    = buf;
+        arg.filler = filler;
 
         filler(buf, ".", NULL, 0);
         filler(buf, "..", NULL, 0);
 
-        arg.filler = filler;
-        arg.buf = buf;
-
-        g_datalist_foreach(&node->nd_children,
-                           ipoddisk_add_node_prop, &arg);
+        g_datalist_foreach(&node->nd_children, ipoddisk_gen_dir_entry, &arg);
 
         return 0;
 }
@@ -137,7 +130,7 @@ static int ipoddisk_open(const char *path, struct fuse_file_info *fi)
 {
         struct ipoddisk_node *node;
 
-        node = ipod_disk_parse_path(path, strlen(path));
+        node = ipoddisk_parse_path(path, strlen(path));
         if (node == NULL)
                 return -ENOENT;
 
@@ -158,7 +151,7 @@ ipoddisk_read (const char *path, char *buf, size_t size,
 
         UNUSED (fi);
 
-        node = ipod_disk_parse_path(path, strlen(path));
+        node = ipoddisk_parse_path(path, strlen(path));
         if(node == NULL ||
            node->nd_type != IPOD_DISK_NODE_LEAF)
                 return -ENOENT;
