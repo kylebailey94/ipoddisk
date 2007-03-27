@@ -42,7 +42,7 @@ ipoddisk_getattr (const char *path, struct stat *stbuf)
 
         memset(stbuf, 0, sizeof(*stbuf));
 
-        if (node->nd_type == IPOD_DISK_NODE_LEAF) {
+        if (node->nd_type == IPODDISK_NODE_LEAF) {
                 gchar *file = ipoddisk_node_path(node);
 
                 rc = (lstat(file, stbuf) == -1) ? -errno : 0;
@@ -81,7 +81,7 @@ ipoddisk_access (const char *path, int mask)
                 return -EROFS;
 
         if ((mask & X_OK) && /* only directories are executable */
-            node->nd_type == IPOD_DISK_NODE_LEAF)
+            node->nd_type == IPODDISK_NODE_LEAF)
                 return -EACCES;
 
         return 0;
@@ -95,11 +95,9 @@ struct __readdir_arg {
 void
 ipoddisk_gen_dir_entry(GQuark key_id, gpointer data, gpointer user_data)
 {
-	struct ipoddisk_node *node = data;
         struct __readdir_arg *arg = user_data;
 
-
-        (arg->filler)(arg->buf, node->nd_name, NULL, 0);
+        (arg->filler)(arg->buf, g_quark_to_string(key_id), NULL, 0);
 }
 
 static int ipoddisk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -112,7 +110,7 @@ static int ipoddisk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         UNUSED(offset);
 
         node = ipoddisk_parse_path(path, strlen(path));
-        if(node == NULL || node->nd_type == IPOD_DISK_NODE_LEAF)
+        if(node == NULL || node->nd_type == IPODDISK_NODE_LEAF)
                 return -ENOENT;
 
         arg.buf    = buf;
@@ -153,7 +151,7 @@ ipoddisk_read (const char *path, char *buf, size_t size,
 
         node = ipoddisk_parse_path(path, strlen(path));
         if(node == NULL ||
-           node->nd_type != IPOD_DISK_NODE_LEAF)
+           node->nd_type != IPODDISK_NODE_LEAF)
                 return -ENOENT;
 
         file = ipoddisk_node_path(node);
@@ -187,7 +185,7 @@ ipoddisk_getxattr (const char *path, const char *name, char *value, size_t size)
         if (node == NULL)
                 return -ENOENT;
 
-        if (node->nd_type != IPOD_DISK_NODE_LEAF)
+        if (node->nd_type != IPODDISK_NODE_LEAF)
                 return -EPERM;
 
         file = ipoddisk_node_path(node);
@@ -209,7 +207,7 @@ ipoddisk_listxattr (const char *path, char *list, size_t size)
         if (node == NULL)
                 return -ENOENT;
 
-        if (node->nd_type != IPOD_DISK_NODE_LEAF)
+        if (node->nd_type != IPODDISK_NODE_LEAF)
                 return -EPERM;
 
         file = ipoddisk_node_path(node);

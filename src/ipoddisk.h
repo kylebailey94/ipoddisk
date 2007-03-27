@@ -24,10 +24,10 @@
 
 /* Types of node */
 typedef enum {
-	IPOD_DISK_NODE_ROOT,
-	IPOD_DISK_NODE_IPOD,
-	IPOD_DISK_NODE_DEFAULT,
-	IPOD_DISK_NODE_LEAF
+	IPODDISK_NODE_ROOT,
+	IPODDISK_NODE_IPOD,
+	IPODDISK_NODE_DEFAULT,
+	IPODDISK_NODE_LEAF
 } ipoddisk_node_type;
 
 struct ipoddisk_ipod {
