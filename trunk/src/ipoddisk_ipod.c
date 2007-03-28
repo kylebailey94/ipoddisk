@@ -231,7 +231,7 @@ ipoddisk_add_playlist_member (gpointer data, gpointer user_data)
 {
 	Itdb_Track              *itdbtrk = data;
 	struct __add_member_arg *argp = user_data;
-	struct ipoddisk_node    *track;
+	struct ipoddisk_node    *track = itdbtrk->userdata;
 	gchar                   *track_ext;
 	gchar                   *track_name;
 
@@ -249,11 +249,16 @@ ipoddisk_add_playlist_member (gpointer data, gpointer user_data)
                 track_name = g_strconcat(track_name, track_ext, NULL);
         }
 
-	track = ipoddisk_new_node(argp->playlist, track_name,
-                                  IPODDISK_NODE_LEAF);
-        /* TODO: store itdbtrk in rack->nd_data.track */
-	track->nd_children = (GData *) itdbtrk;
-        track->nd_data.track.trk_ipod = &argp->ipod->nd_data.ipod;
+        if (track == NULL) {
+                track = ipoddisk_new_node(argp->playlist, track_name,
+                                          IPODDISK_NODE_LEAF);
+                /* TODO: store itdbtrk in rack->nd_data.track */
+                track->nd_children = (GData *) itdbtrk;
+                track->nd_data.track.trk_ipod = &argp->ipod->nd_data.ipod;
+                itdbtrk->userdata = track;
+        } else {
+                ipoddisk_add_child(argp->playlist, track, track_name);
+        }
 
 	argp->counter++;
         g_free(track_name);
