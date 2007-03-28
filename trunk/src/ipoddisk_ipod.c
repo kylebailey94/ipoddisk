@@ -129,37 +129,39 @@ ipoddisk_encode_name (gchar **strpp)
  * Adds a child to a parent node, and enure uniqueness of its key
  */
 static void
-ipoddisk_add_child (struct ipoddisk_node *parent, struct ipoddisk_node *child)
+ipoddisk_add_child (struct ipoddisk_node *parent,
+                    struct ipoddisk_node *child, gchar *key)
 {
         int    ndup = 0;
-        gchar *key = g_strdup(child->nd_name);
+        gchar *new_key = g_strdup(key);
         
-        while (g_datalist_get_data(&parent->nd_children, key)) {
+        while (g_datalist_get_data(&parent->nd_children, new_key)) {
                 ndup++;
-                g_free(key);
-                key = g_strdup_printf("(%d) %s", ndup, child->nd_name);
+                g_free(new_key);
+                new_key = g_strdup_printf("(%d) %s", ndup, key);
         }
 
-        g_datalist_set_data(&parent->nd_children, key, child);
-        g_free(key);
+        g_datalist_set_data(&parent->nd_children, new_key, child);
+        g_free(new_key);
 
         return;
 }
 
 static inline struct ipoddisk_node *
-ipoddisk_new_node (struct ipoddisk_node *parent, char *name,
+ipoddisk_new_node (struct ipoddisk_node *parent, gchar *key,
                    ipoddisk_node_type type)
 {
         struct ipoddisk_node *node = g_slice_new(struct ipoddisk_node);
 
-        node->nd_name = name;
+        assert (parent == NULL || key != NULL);
+
         node->nd_type = type;
 
         if (type != IPODDISK_NODE_LEAF) /* leaf node has no children */
                 g_datalist_init(&node->nd_children);
 
         if (parent != NULL)
-                ipoddisk_add_child(parent, node);
+                ipoddisk_add_child(parent, node, key);
 
         return node;
 }
@@ -197,22 +199,23 @@ ipoddisk_add_track (Itdb_Track *itdbtrk,
 		album = ipoddisk_new_node(artist, album_name,
                                           IPODDISK_NODE_DEFAULT);
                 if (albums != NULL)
-                        ipoddisk_add_child(albums, album);
-        }
-
-        if (track != NULL) {
-                ipoddisk_add_child(album, track);
-                return;
+                        ipoddisk_add_child(albums, album, album_name);
         }
 
         track_ext = ipod_get_track_extension(itdbtrk->ipod_path);
         track_name = g_strconcat(track_name, track_ext, NULL);
-        track = ipoddisk_new_node(album, track_name,
-                                  IPODDISK_NODE_LEAF);
-        track->nd_children = (GData *) itdbtrk;
-        track->nd_data.track.trk_ipod = ipod;
-        itdbtrk->userdata = track;
 
+        if (track != NULL) {
+                ipoddisk_add_child(album, track, track_name);
+        } else {
+                track = ipoddisk_new_node(album, track_name,
+                                          IPODDISK_NODE_LEAF);
+                track->nd_children = (GData *) itdbtrk;
+                track->nd_data.track.trk_ipod = ipod;
+                itdbtrk->userdata = track;
+        }
+
+        g_free(track_name);
 	return;
 }
 
@@ -253,6 +256,7 @@ ipoddisk_add_playlist_member (gpointer data, gpointer user_data)
         track->nd_data.track.trk_ipod = &argp->ipod->nd_data.ipod;
 
 	argp->counter++;
+        g_free(track_name);
 	return;
 }
 
@@ -414,8 +418,11 @@ ipoddisk_init_ipods (void)
 		return ENOENT;
         }
 
+        ipoddisk_tree = ipoddisk_new_node(NULL, NULL, IPODDISK_NODE_ROOT);
+
         for (i = 0, ipodnr = 0; i < fsnr && ipodnr < IPODDISK_MAX_IPOD; i++) {
                 gchar                *dbpath;
+                gchar                *ipodname;
                 struct ipoddisk_node *node;
 
                 if (strncasecmp(stats[i].f_mntfromname,
@@ -441,13 +448,15 @@ ipoddisk_init_ipods (void)
                         continue;
                 }
 
-                node->nd_name = g_path_get_basename(stats[i].f_mntonname);
+                ipodname = g_path_get_basename(stats[i].f_mntonname);
+                ipoddisk_add_child(ipoddisk_tree, node, ipodname);
                 node->nd_data.ipod.ipod_mp = g_strdup(stats[i].f_mntonname);
 
                 ipods[ipodnr] = node;
                 ipodnr++;
                 
                 g_free(dbpath);
+                g_free(ipodname);
         }
 
         g_free(stats);
@@ -458,13 +467,7 @@ ipoddisk_init_ipods (void)
         if (ipodnr == 1) {
                 ipoddisk_tree = ipods[0];
                 ipoddisk_tree->nd_type = IPODDISK_NODE_ROOT;
-                return 0;
         }
-
-        ipoddisk_tree = ipoddisk_new_node(NULL, "*Mount Point*",
-                                          IPODDISK_NODE_ROOT);
-        for (i = 0; i < ipodnr; i++)
-                ipoddisk_add_child(ipoddisk_tree, ipods[i]);
 
         return 0;
 }

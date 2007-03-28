@@ -40,7 +40,6 @@ struct ipoddisk_track {
 };
 
 struct ipoddisk_node {
-	gchar              *nd_name;
 	GData              *nd_children;
 	ipoddisk_node_type  nd_type;
         union {
