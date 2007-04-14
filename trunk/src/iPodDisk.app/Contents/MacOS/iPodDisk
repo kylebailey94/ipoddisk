@@ -68,7 +68,7 @@ mount_point=/Volumes/iPodDisk/
 mkdir $mount_point
 
 # filenames must be double-quoted because $rootdir may contain spaces
-"$macosdir/ipoddiskfuse" -oping_diskarb,volname=iPodDisk,fsname=iPodDisk $mount_point
+"$macosdir/ipoddiskfuse" -oping_diskarb,subtype=1,volname=iPodDisk,fsname=iPodDisk $mount_point
 
 errcode=$?
 if [ $errcode -ne 0 ]

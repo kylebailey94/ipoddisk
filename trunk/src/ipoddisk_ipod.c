@@ -317,11 +317,13 @@ ipoddisk_build_ipod_node (struct ipoddisk_node *root, Itdb_iTunesDB *itdb)
 
                 list = g_list_next(list);
 
-                if (itdb_playlist_is_mpl(itdbpl))
-                        continue;
-
-		ipoddisk_encode_name(&itdbpl->name);
-                pl_name = itdbpl->name ? itdbpl->name : "Unknown Playlist";
+                if (itdb_playlist_is_mpl(itdbpl)) {
+                        pl_name = "Master Playlist";
+                        continue; /* ignore mpl for now, make it optional in the future */
+                } else {
+                        ipoddisk_encode_name(&itdbpl->name);
+                        pl_name = itdbpl->name ? itdbpl->name : "Unknown Playlist";
+                }
 
                 pl = g_datalist_get_data(&playlists->nd_children, pl_name);
                 if (pl == NULL)
