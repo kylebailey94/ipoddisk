@@ -27,8 +27,8 @@ fi
 # check MacFUSE
 if [ ! -f /usr/local/lib/libfuse.dylib ]
 then
-  display_warning_dialog "Please download and install MacFUSE first."
-  open http://code.google.com/p/macfuse/
+  display_warning_dialog "Please install MacFUSE first."
+  open 'http://code.google.com/p/macfuse/downloads/detail?name=MacFUSE-Core-0.2.4.dmg&can=2&q='
   exit 1
 fi
 
