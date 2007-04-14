@@ -272,18 +272,21 @@ ipoddisk_build_ipod_node (struct ipoddisk_node *root, Itdb_iTunesDB *itdb)
         struct ipoddisk_node *genres;
         struct ipoddisk_node *albums;
         struct ipoddisk_node *artists;
+        struct ipoddisk_node *compilations;
         struct ipoddisk_node *playlists;
 
-        genres    = ipoddisk_new_node(root, "Genres", IPODDISK_NODE_DEFAULT);
-        albums    = ipoddisk_new_node(root, "Albums", IPODDISK_NODE_DEFAULT);
-        artists   = ipoddisk_new_node(root, "Artists", IPODDISK_NODE_DEFAULT);
-        playlists = ipoddisk_new_node(root, "Playlists", IPODDISK_NODE_DEFAULT);
+        genres       = ipoddisk_new_node(root, "Genres", IPODDISK_NODE_DEFAULT);
+        albums       = ipoddisk_new_node(root, "Albums", IPODDISK_NODE_DEFAULT);
+        artists      = ipoddisk_new_node(root, "Artists", IPODDISK_NODE_DEFAULT);
+        playlists    = ipoddisk_new_node(root, "Playlists", IPODDISK_NODE_DEFAULT);
+        compilations = ipoddisk_new_node(root, "Compilations", IPODDISK_NODE_DEFAULT);
 
         /* Populate iPodDisk/(Artists|Albums|Genres) */
         list = itdb->tracks;
         while (list) {
                 Itdb_Track           *itdbtrk = list->data;
-                struct ipoddisk_node *genre;
+                struct ipoddisk_node *comp;
+                gchar                *comp_title;
 
                 list = g_list_next(list);
 
@@ -295,15 +298,32 @@ ipoddisk_build_ipod_node (struct ipoddisk_node *root, Itdb_iTunesDB *itdb)
                 ipoddisk_add_track(itdbtrk, artists, albums,
                                    NULL, &root->nd_data.ipod);
 
-                if (itdbtrk->genre == NULL || strlen(itdbtrk->genre) == 0)
+                if (itdbtrk->genre != NULL && strlen(itdbtrk->genre) != 0) {
+                        struct ipoddisk_node *genre;
+                        
+                        genre = g_datalist_get_data(&genres->nd_children, itdbtrk->genre);
+                        if (genre == NULL)
+                                genre = ipoddisk_new_node(genres, itdbtrk->genre,
+                                                          IPODDISK_NODE_DEFAULT);
+                        ipoddisk_add_track(itdbtrk, genre, NULL,
+                                           (struct ipoddisk_node *) itdbtrk->userdata, NULL);
+                }
+
+                if (!itdbtrk->compilation || /* not part of a compilation */
+                    itdbtrk->album == NULL || itdbtrk->title == NULL)
                         continue;
 
-                genre = g_datalist_get_data(&genres->nd_children, itdbtrk->genre);
-                if (genre == NULL)
-                        genre = ipoddisk_new_node(genres, itdbtrk->genre,
-                                                  IPODDISK_NODE_DEFAULT);
-                ipoddisk_add_track(itdbtrk, genre, NULL,
-                                   (struct ipoddisk_node *) itdbtrk->userdata, NULL);
+                comp = g_datalist_get_data(&compilations->nd_children, itdbtrk->album);
+                if (comp == NULL)
+                        comp = ipoddisk_new_node(compilations, itdbtrk->album,
+                                                 IPODDISK_NODE_DEFAULT);
+
+                comp_title = g_strconcat(itdbtrk->title,
+                                         ipod_get_track_extension(itdbtrk->ipod_path), 
+                                         NULL);
+                assert (itdbtrk->userdata != NULL);
+                ipoddisk_add_child(comp, itdbtrk->userdata, comp_title);
+                g_free(comp_title);
         }
 
         /* Populate iPodDisk/Playlists */
